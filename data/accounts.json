@@ -1,0 +1,12 @@
+[
+  {
+    "sessionid": "xxxx",
+    "name": "xxx",
+    "status_code": "valid",
+    "last_error": "",
+    "last_request_started": 0.0,
+    "last_request_finished": 0.0,
+    "consecutive_failures": 0,
+    "rate_limit_strikes": 0
+  }
+]

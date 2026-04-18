@@ -1,0 +1,24 @@
+services:
+  doubao2api:
+    build: .
+    container_name: doubao2api
+    restart: unless-stopped
+    env_file:
+      - path: .env
+        required: false
+    ports:
+      - "7861:7861"
+    volumes:
+      - ./data:/workspace/data
+      - ./logs:/workspace/logs
+    shm_size: '256m'
+    environment:
+      PYTHONIOENCODING: utf-8
+      PORT: "7861"
+      ENGINE_MODE: "browser"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:7861/healthz"]
+      interval: 30s
+      timeout: 10s
+      start_period: 120s
+      retries: 3
