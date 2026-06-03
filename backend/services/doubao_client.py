@@ -229,6 +229,16 @@ class DoubaoClient:
 
         full_text = ""
         session_meta_updated = False
+        # 文本来源锁：避免 CHUNK_DELTA 与 STREAM_CHUNK(block 10000) 重复 yield 同一文本
+        text_source: Optional[str] = None
+
+        def _accept_text(source: str) -> bool:
+            """判断该来源是否可输出文本（首个出文本的来源会被锁定）。"""
+            nonlocal text_source
+            if text_source is None:
+                text_source = source
+                return True
+            return text_source == source
 
         for evt in events:
             if evt.event_type == "SSE_HEARTBEAT":
@@ -267,7 +277,7 @@ class DoubaoClient:
             elif evt.event_type == "CHUNK_DELTA":
                 # 增量文本（最简洁路径）
                 text = evt.data.get("text", "")
-                if text:
+                if text and _accept_text("chunk_delta"):
                     full_text += text
                     yield {"type": "delta", "content": text}
 
@@ -287,7 +297,7 @@ class DoubaoClient:
                             elif block_type == 10000:
                                 # 文本块增量
                                 text = block.get("content", {}).get("text_block", {}).get("text", "")
-                                if text:
+                                if text and _accept_text("stream_chunk"):
                                     full_text += text
                                     yield {"type": "delta", "content": text}
                     elif patch_object == 102:
@@ -298,7 +308,7 @@ class DoubaoClient:
                             try:
                                 content_obj = json.loads(content_str) if isinstance(content_str, str) else content_str
                                 text = content_obj.get("text", "")
-                                if text:
+                                if text and _accept_text("stream_chunk"):
                                     full_text += text
                                     yield {"type": "delta", "content": text}
                             except (json.JSONDecodeError, AttributeError):

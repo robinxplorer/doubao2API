@@ -37,6 +37,15 @@ log = logging.getLogger("doubao2api")
 async def lifespan(app: FastAPI):
     log.info("Starting doubao2API — BrowserOnly Gateway...")
 
+    # 安全检查：ADMIN_KEY 仍为默认值时高声告警
+    # 管理后台（账号/Key 管理）仅靠 ADMIN_KEY 保护，默认值等于不设防
+    if settings.ADMIN_KEY == "admin":
+        log.warning(
+            "⚠️ 安全警告：ADMIN_KEY 仍为默认值 'admin'！\n"
+            "  管理后台 /api/admin/* 将处于无保护状态。\n"
+            "  请在 .env 或环境变量中设置一个强 ADMIN_KEY 后重启。"
+        )
+
     # 初始化数据库
     app.state.accounts_db = AsyncJsonDB(settings.ACCOUNTS_FILE, default_data=[])
     app.state.users_db = AsyncJsonDB(settings.USERS_FILE, default_data=[])

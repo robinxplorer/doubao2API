@@ -44,6 +44,19 @@ class DoubaoSSEParser:
         self.result = StreamResult()
         self._full_text = ""
         self._session_meta = SessionMeta()
+        # 文本来源锁：豆包可能同时下发 CHUNK_DELTA 与 STREAM_CHUNK(block_type=10000)
+        # 两条路径携带相同文本会导致重复累加，故锁定首个出文本的来源，忽略另一路
+        self._text_source: Optional[str] = None  # "chunk_delta" | "stream_chunk"
+
+    def _append_text(self, text: str, source: str):
+        """按来源锁追加文本，防止两条 SSE 路径重复累加。"""
+        if not text:
+            return
+        if self._text_source is None:
+            self._text_source = source
+        elif self._text_source != source:
+            return  # 非锁定来源，丢弃以避免重复
+        self._full_text += text
 
     def parse_raw_sse(self, raw_body: str) -> StreamResult:
         """解析完整的 SSE 响应文本"""
@@ -203,9 +216,7 @@ class DoubaoSSEParser:
 
     def _process_chunk_delta(self, data: dict):
         """处理 CHUNK_DELTA 事件 - 增量文本（最简洁路径）"""
-        text = data.get("text", "")
-        if text:
-            self._full_text += text
+        self._append_text(data.get("text", ""), "chunk_delta")
 
     _first_stream_chunk_logged = 0  # 类变量，控制诊断打印前N个
     _stream_msg_logged = False
@@ -238,8 +249,7 @@ class DoubaoSSEParser:
                     elif block_type == 10000:
                         # 文本块 — 提取增量文本
                         text = block.get("content", {}).get("text_block", {}).get("text", "")
-                        if text:
-                            self._full_text += text
+                        self._append_text(text, "stream_chunk")
                     elif block_type == 10101:
                         # loading_block — 忽略
                         pass
@@ -266,13 +276,11 @@ class DoubaoSSEParser:
                 if content_str:
                     try:
                         content_obj = json.loads(content_str) if isinstance(content_str, str) else content_str
-                        text = content_obj.get("text", "")
-                        if text:
-                            self._full_text += text
+                        self._append_text(content_obj.get("text", ""), "stream_chunk")
                     except (json.JSONDecodeError, AttributeError):
                         # 非标准 JSON，尝试直接取文本
                         if isinstance(content_str, str) and content_str:
-                            self._full_text += content_str
+                            self._append_text(content_str, "stream_chunk")
 
             elif patch_object == 50:
                 # ext 元数据更新 - 可能包含建议

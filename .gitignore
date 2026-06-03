@@ -104,6 +104,10 @@ __pypackages__/
 .env.test.local
 .env.production.local
 
+# AI
+.claude/
+CLAUDE.md
+
 # misc
 *.swp
 *~

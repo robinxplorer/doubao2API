@@ -88,8 +88,10 @@ def _check_auth(request: Request) -> str:
 
     admin_k = settings.ADMIN_KEY
 
+    # API Key 列表非空时，必须持有 ADMIN_KEY 或已登记的 Key
+    # （此前的 `and not token` 逻辑导致任意非空无效 Key 都能通过鉴权）
     if API_KEYS:
-        if token != admin_k and token not in API_KEYS and not token:
+        if token != admin_k and token not in API_KEYS:
             raise HTTPException(status_code=401, detail="Invalid API Key")
 
     return token
